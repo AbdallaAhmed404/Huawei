@@ -9,7 +9,8 @@ const giftSchema = new mongoose.Schema({
 // سكيما فرعية للألوان مع صورها
 const colorVariantSchema = new mongoose.Schema({
     colorCode: { type: String, required: true }, // اسم اللون (مثلاً: أسود كربوني)
-    images: [{ type: String, required: true }]   // مصفوفة صور خاصة بهذا اللون فقط
+    images: [{ type: String, required: true }] ,  // مصفوفة صور خاصة بهذا اللون فقط
+    count: { type: Number, default: 0 }
 });
 
 const productSchema = new mongoose.Schema({
