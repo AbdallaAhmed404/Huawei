@@ -7,6 +7,12 @@ const storeSettingsSchema = new mongoose.Schema({
         link: String, // اختياري لو عايز السلايدر يودي لصفحة معينة
     }],
 
+    welcomePopup: {
+        imageUrl: String,
+        link: String,
+        isActive: { type: Boolean, default: true }
+    },
+
     // 2. Categories Architecture & Icons (Main & Sub)
     categoriesConfig: [{
         mainCategoryName: String, 
@@ -16,16 +22,6 @@ const storeSettingsSchema = new mongoose.Schema({
             icon: String          // صورة الـ sub-category
         }]
     }],
-
-    // 3. New Arrivals (وصل حديثاً)
-    // هنا هنخزن الـ IDs بتاعة المنتجات اللي اخترتها عشان تعرضها
-    // newArrivals: [{
-    //     categoryGroup: String, // Phones, Laptops...
-    //     productId: { 
-    //         type: mongoose.Schema.Types.ObjectId, 
-    //         ref: 'Product' 
-    //     }
-    // }]
 }, { timestamps: true });
 
 module.exports = mongoose.model('StoreSettings', storeSettingsSchema);

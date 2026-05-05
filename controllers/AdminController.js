@@ -512,7 +512,7 @@ const updateSubCategoryIcon = async (req, res) => {
 
 const getAllCoupons = async (req, res) => {
     try {
-        const coupons = await Coupon.find().sort({ createdAt: -1 });
+        const coupons = await Coupon.find().populate("applicableProduct", "name price").sort({ createdAt: -1 });
         res.status(200).json({ coupons });
     } catch (error) {
         res.status(500).json({ message: "Error fetching coupons", error: error.message });
@@ -520,7 +520,7 @@ const getAllCoupons = async (req, res) => {
 };
 const createCoupon = async (req, res) => {
     try {
-        const { code, discountType, discountValue, expiryDate, usageLimit } = req.body;
+        const { code, discountType, discountValue, expiryDate, usageLimit,couponType,applicableProduct } = req.body;
 
         // التأكد من عدم تكرار الكود
         const existing = await Coupon.findOne({ code: code.toUpperCase() });
@@ -533,7 +533,10 @@ const createCoupon = async (req, res) => {
             discountType,
             discountValue,
             expiryDate,
-            usageLimit: usageLimit || 100
+            usageLimit: usageLimit || 100,
+            couponType: couponType || 'global',
+            // إذا كان النوع global، نضمن تخزين القيمة كـ null حتى لو أرسل الفرونت بيانات خاطئة
+            applicableProduct: couponType === 'product-specific' ? applicableProduct : null
         });
 
         await newCoupon.save();
@@ -568,16 +571,20 @@ const incrementCouponUsage = async (req, res) => {
         res.status(500).json({ message: "خطأ في تحديث بيانات الكوبون" });
     }
 }; 
+
+
 const validateCoupon = async (req, res) => {
     try {
-        const { code } = req.body;
+        // ننتظر الكود ومصفوفة المنتجات من الفرونت إند
+        const { code, cartItems } = req.body; 
+
         const coupon = await Coupon.findOne({ code: code.toUpperCase() });
 
         if (!coupon) {
             return res.status(404).json({ message: "Invalid coupon code" });
         }
 
-        // التحقق من الحالة والتاريخ وعدد الاستخدام
+        // 1. التحقق من الصلاحية العامة (الحالة، التاريخ، عدد الاستخدام)
         const now = new Date();
         if (!coupon.isActive) {
             return res.status(400).json({ message: "This coupon is no longer active" });
@@ -589,16 +596,80 @@ const validateCoupon = async (req, res) => {
             return res.status(400).json({ message: "This coupon has reached its maximum usage limit" });
         }
 
+        // 2. التحقق من نوع الكوبون (Global vs Product-specific)
+        if (coupon.couponType === 'product-specific') {
+            if (!cartItems || !Array.isArray(cartItems)) {
+                return res.status(400).json({ message: "Cart items are required to validate this coupon" });
+            }
+
+            // التأكد هل المنتج المخصص للكوبون موجود في سلة التسوق
+            const isProductInCart = cartItems.some(item => 
+                item.productId.toString() === coupon.applicableProduct.toString()
+            );
+
+            if (!isProductInCart) {
+                return res.status(400).json({ 
+                    message: "This coupon is only valid for a specific product not found in your cart" 
+                });
+            }
+        }
+
+        // 3. الرد في حالة النجاح
         res.status(200).json({
             success: true,
+            message: "Coupon applied successfully",
             discountType: coupon.discountType,
             discountValue: coupon.discountValue,
+            couponType: coupon.couponType,
+            applicableProduct: coupon.applicableProduct,
             code: coupon.code
         });
+
     } catch (error) {
+        console.error("Validation Error:", error);
         res.status(500).json({ message: "An error occurred while validating the coupon" });
     }
 };
+
+// جلب بيانات البوب اب
+const getPopup = async (req, res) => {
+    try {
+        const settings = await StoreSettings.findOne();
+        res.status(200).json({ popup: settings?.welcomePopup || null });
+    } catch (error) {
+        res.status(500).json({ message: "Server Error", error: error.message });
+    }
+};
+
+// تحديث البوب اب (صورة واحدة فقط)
+const updatePopup = async (req, res) => {
+    try {
+        const { imageUrl, link } = req.body;
+
+        const settings = await StoreSettings.findOne();
+
+        // إذا كان هناك صورة قديمة، قم بحذفها من Cloudflare R2 أولاً
+        if (settings?.welcomePopup?.imageUrl) {
+            await deleteFileFromR2(settings.welcomePopup.imageUrl);
+        }
+
+        // تحديث البيانات (أو إنشاؤها إذا لم تكن موجودة)
+        const updatedSettings = await StoreSettings.findOneAndUpdate(
+            {},
+            { welcomePopup: { imageUrl, link, isActive: true } },
+            { new: true, upsert: true }
+        );
+
+        res.status(200).json({ 
+            message: "Popup updated and old image deleted", 
+            popup: updatedSettings.welcomePopup 
+        });
+    } catch (error) {
+        res.status(400).json({ message: "Failed to update popup", error: error.message });
+    }
+};
+
+
 module.exports = {
     getAllOrders,
     updateOrderStatus,
@@ -623,5 +694,7 @@ module.exports = {
     deleteCoupon,
     incrementCouponUsage,
     validateCoupon,
-    zero
+    zero,
+    getPopup,
+    updatePopup
 };

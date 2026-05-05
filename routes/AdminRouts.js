@@ -3,7 +3,11 @@ const AdminRouter = express.Router()
 const isAdmin = require('../middlewares/isAdmin');
 const { getUploadUrl,getAllOrders,updateOrderStatus,deleteOrder,adminRegister,updateAdminPassword, AddProduct, AllProduct, 
         UpdateProduct, DeleteProduct,adminLogin,getProductsSortedBySoldCount,getSliders,addSlider,deleteSlider,getCategories,updateMainCategoryIcon,
-        updateSubCategoryIcon,getAllCoupons,createCoupon,deleteCoupon,validateCoupon,zero } = require('../controllers/AdminController')
+        updateSubCategoryIcon,getAllCoupons,createCoupon,deleteCoupon,validateCoupon,zero,getPopup,updatePopup } = require('../controllers/AdminController')
+
+AdminRouter.get('/popup', getPopup);
+
+AdminRouter.patch('/popup', updatePopup);
 
 AdminRouter.post('/validate-coupon', validateCoupon);
 
