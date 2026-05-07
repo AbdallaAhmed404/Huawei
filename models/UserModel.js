@@ -9,11 +9,13 @@ const __ = require('lodash')
 
 const userSchema = new mongoose.Schema(
   {
-    Name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    mobile: { type: String},
-    resetCode: { type: String, select: false }
+    firstName: { type: String, required: true },
+    lastName: { type: String, required: true },
+    phone: { type: String, required: true },
+    email: { type: String, required: true, unique: true }, // لازم يكون unique
+    password: { type: String, required: true }, // ضيف الحقل ده
+    city: String,
+    district: String
   },
   {
     toJSON: {

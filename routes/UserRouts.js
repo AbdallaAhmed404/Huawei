@@ -1,8 +1,11 @@
 const express = require('express')
 const UserRouter = express.Router()
 const authorized = require('../middlewares/Authorized')
-const {addMessage,deleteMessage, getAllMessages, AllProduct, makeOrder ,getProductById,getProductsByCategory,payWithPaymob} = require('../controllers/UserController')
+const {register,login,getUserProfile,addMessage,deleteMessage, getAllMessages, AllProduct, makeOrder ,getProductById,getProductsByCategory,payWithPaymob} = require('../controllers/UserController')
 
+UserRouter.get('/profile', authorized, getUserProfile);
+UserRouter.post('/register', register);
+UserRouter.post('/login', login);
 UserRouter.post('/paymob', payWithPaymob);
 UserRouter.get("/product/:id", getProductById);
 UserRouter.get('/allproduct', AllProduct); 

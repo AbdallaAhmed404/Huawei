@@ -10,6 +10,32 @@ const jwt = require('jsonwebtoken');
 const OrderModel = require("../models/OrderModel");
 const StoreSettings = require('../models/StoreSettings');
 const Coupon = require('../models/Coupon');
+const ProductGallery = require('../models/ProductGallery');
+const Stats = require('../models/Stats');
+
+const trackVisit = async (req, res) => {
+    try {
+        // بيبحث عن العداد اللي اسمه site_visits ويزوده 1
+        // لو مش موجود في قاعدة البيانات بيكريهه أوتوماتيك (upsert: true)
+        await Stats.findOneAndUpdate(
+            { key: 'site_visits' },
+            { $inc: { count: 1 } },
+            { upsert: true, new: true }
+        );
+        res.status(200).json({ success: true, message: "Visit counted" });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+const getStats = async (req, res) => {
+    try {
+        const data = await Stats.findOne({ key: 'site_visits' });
+        res.status(200).json({ totalVisits: data ? data.count : 0 });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
 
 const R2 = new S3Client({
     region: "auto",
@@ -224,6 +250,7 @@ const AddProduct = async (req, res, next) => {
             name: req.body.name,
             description: req.body.description,
             modelName: req.body.modelName,
+            variants: req.body.variants,
             image: req.body.image,
             price: req.body.price,
             discount: req.body.discount,
@@ -284,7 +311,7 @@ const AllProduct = async (req, res) => {
 
 const UpdateProduct = async (req, res, next) => {
     try {
-        const { _id, name, price, description, category, subCategory, image, discount, modelName, colors, gifts, installmentPrice, countInStock } = req.body;
+        const { _id, name, price, description, category,variants, subCategory, image, discount, modelName, colors, gifts, installmentPrice, countInStock } = req.body;
 
         // 1. البحث عن المنتج باستخدام الـ _id (التنسيق الافتراضي لمونجو)
         const product = await ProductModel.findById(_id);
@@ -327,6 +354,7 @@ const UpdateProduct = async (req, res, next) => {
         product.price = price;
         product.description = description;
         product.category = category;
+        product.variants = variants || [];
         product.subCategory = subCategory;
         product.image = image;
         product.discount = discount;
@@ -669,6 +697,106 @@ const updatePopup = async (req, res) => {
     }
 };
 
+const AddProductGallery = async (req, res, next) => {
+    try {
+        const { productId, galleryItems } = req.body;
+
+        // 1. التأكد من إرسال البيانات المطلوبة
+        if (!productId || !galleryItems || !Array.isArray(galleryItems)) {
+            return res.status(400).json({ message: "Missing productId or galleryItems array" });
+        }
+
+        // 2. التحقق إذا كان المنتج له جاليري بالفعل (منع التكرار)
+        const existingGallery = await ProductGallery.findOne({ productId });
+        if (existingGallery) {
+            return res.status(400).json({ 
+                message: "Gallery already exists for this product. Use Update instead." 
+            });
+        }
+
+        // 3. إنشاء الجاليري الجديد
+        // بما أن الصور ترفع من الفرونت، اللينكات جاهزة في galleryItems
+        const newGallery = new ProductGallery({
+            productId,
+            galleryItems
+        });
+
+        await newGallery.save();
+
+        res.status(201).json({
+            message: "Product gallery created successfully",
+            gallery: newGallery
+        });
+
+    } catch (err) {
+        console.error("❌ Add Gallery Error:", err);
+        return next(customError({
+            statusCode: 500,
+            message: "Failed to create product gallery"
+        }));
+    }
+};
+
+const getProductGallery = async (req, res, next) => {
+    try {
+        const gallery = await ProductGallery.findOne({ productId: req.params.productId });
+        if (!gallery) return res.status(200).json({ galleryItems: [] });
+        res.status(200).json(gallery);
+    } catch (err) {
+        next(customError({ statusCode: 500, message: "Error fetching gallery" }));
+    }
+};
+
+// إضافة أو تحديث الجاليري بالكامل
+const upsertProductGallery = async (req, res, next) => {
+    try {
+        const { productId, galleryItems } = req.body;
+
+        // البحث عن الجاليري القديم لمقارنة الصور وحذف المحذوف من R2
+        const oldGallery = await ProductGallery.findOne({ productId });
+
+        if (oldGallery) {
+            // منطق الحذف من السحاب (Cloud Cleanup)
+            const oldImages = oldGallery.galleryItems.flatMap(item => item.images);
+            const newImages = galleryItems.flatMap(item => item.images);
+            
+            const imagesToDelete = oldImages.filter(img => !newImages.includes(img));
+            
+            for (const imgUrl of imagesToDelete) {
+                await deleteFileFromR2(imgUrl);
+            }
+        }
+
+        const updatedGallery = await ProductGallery.findOneAndUpdate(
+            { productId },
+            { galleryItems },
+            { new: true, upsert: true }
+        );
+
+        res.status(200).json({ message: "Gallery synced successfully", updatedGallery });
+    } catch (err) {
+        next(customError({ statusCode: 500, message: "Failed to sync gallery" }));
+    }
+};
+
+// حذف الجاليري بالكامل مع الصور من السحاب
+const deleteProductGallery = async (req, res, next) => {
+    try {
+        const gallery = await ProductGallery.findOne({ productId: req.params.productId });
+        if (!gallery) return res.status(404).json({ message: "Gallery not found" });
+
+        // حذف كل الصور المرتبطة بالجاليري من R2
+        const allImages = gallery.galleryItems.flatMap(item => item.images);
+        for (const imgUrl of allImages) {
+            await deleteFileFromR2(imgUrl);
+        }
+
+        await ProductGallery.findOneAndDelete({ productId: req.params.productId });
+        res.status(200).json({ message: "Gallery and all assets deleted from cloud" });
+    } catch (err) {
+        next(customError({ statusCode: 500, message: "Failed to delete gallery" }));
+    }
+};
 
 module.exports = {
     getAllOrders,
@@ -696,5 +824,11 @@ module.exports = {
     validateCoupon,
     zero,
     getPopup,
-    updatePopup
+    updatePopup,
+    getProductGallery,
+    upsertProductGallery,
+    deleteProductGallery,
+    AddProductGallery,
+    trackVisit,
+    getStats
 };

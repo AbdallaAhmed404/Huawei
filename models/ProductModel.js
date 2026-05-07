@@ -24,6 +24,11 @@ const productSchema = new mongoose.Schema({
     // الألوان والصور المرتبطة بها
     colors: [colorVariantSchema], 
 
+    variants: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Product'
+    }],
+
     category: { 
         type: String, 
         required: true,

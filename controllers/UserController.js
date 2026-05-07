@@ -3,6 +3,9 @@ const customError = require("../customError");
 const OrderModel = require("../models/OrderModel"); // هننشئه بعدين
 const ContactModel = require("../models/ContactModel");
 const axios = require('axios');
+const User = require('../models/UserModel');
+const bcrypt = require('bcryptjs');
+
 
 const payWithPaymob = async (req, res) => {
     try {
@@ -53,6 +56,73 @@ const payWithPaymob = async (req, res) => {
     }
 };
 
+
+const register = async (req, res) => {
+    try {
+        const { firstName, lastName, email, password, phone, city, district } = req.body;
+
+        // التأكد من عدم وجود المستخدم مسبقاً
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({ message: "هذا البريد الإلكتروني مسجل بالفعل" });
+        }
+
+        // إنشاء المستخدم (التشفير سيتم تلقائياً في الـ Pre-save middleware بالموديل)
+        const newUser = new User({
+            firstName,
+            lastName,
+            email,
+            password,
+            phone,
+            city,
+            district
+        });
+
+        await newUser.save();
+
+        // توليد التوكن
+        const token = await newUser.generatetoken();
+
+        res.status(201).json({
+            message: "تم إنشاء الحساب بنجاح",
+            token,
+            user: newUser
+        });
+    } catch (error) {
+        res.status(500).json({ message: "خطأ في السيرفر", error: error.message });
+    }
+};
+
+// 2. تسجيل الدخول
+const login = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        // البحث عن المستخدم
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(401).json({ message: "البريد الإلكتروني أو كلمة المرور غير صحيحة" });
+        }
+
+        // مقارنة كلمة المرور
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(401).json({ message: "البريد الإلكتروني أو كلمة المرور غير صحيحة" });
+        }
+
+        // توليد التوكن
+        const token = await user.generatetoken();
+
+        res.status(200).json({
+            message: "تم تسجيل الدخول بنجاح",
+            token,
+            user
+        });
+    } catch (error) {
+        res.status(500).json({ message: "خطأ في السيرفر", error: error.message });
+    }
+};
+
 // 🧱 عرض كل المنتجات
 const AllProduct = async (req, res, next) => {
   try {
@@ -65,6 +135,28 @@ const AllProduct = async (req, res, next) => {
       message: "Failed to retrieve products"
     }));
   }
+};
+
+const getUserProfile = async (req, res) => {
+    try {
+        // req.user.id يتم توفيره عادةً بواسطة الـ auth middleware بعد فك التوكن
+        const user = await User.findById(req.user.id);
+
+        if (user) {
+            res.json({
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                phone: user.phone,
+                city: user.city || 'Select City',
+                district: user.district || ''
+            });
+        } else {
+            res.status(404).json({ message: 'User not found' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
 };
 
 // 🧾 استقبال الطلب من المستخدم (بدون login)
@@ -97,7 +189,10 @@ const makeOrder = async (req, res) => {
 const getProductById = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const product = await ProductModel.findById(id);
+    const product = await ProductModel.findById(id).populate({
+      path: 'variants',
+      select: 'name modelName price image' // بنحدد الحقول اللي محتاجينها بس عشان السرعة
+    });
 
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
@@ -175,5 +270,8 @@ module.exports = {
   addMessage, 
   getAllMessages,
   deleteMessage,
-  payWithPaymob
+  payWithPaymob,
+  register,
+  login,
+  getUserProfile
 };
