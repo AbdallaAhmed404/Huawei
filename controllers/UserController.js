@@ -123,7 +123,24 @@ const paymobWebhook = async (req, res) => {
       );
 
       if (updatedOrder) {
-        
+        console.log(`✅ Order ${orderId} updated to Processing and Paid.`);
+        const stockUpdates = updatedOrder.items.map(item => {
+          return ProductModel.updateOne(
+            {
+              _id: item.productId,
+              "colors.colorCode": item.colorCode
+            },
+            {
+              $inc: {
+                "colors.$.count": -item.quantity,
+                "countInStock": -item.quantity
+              }
+            }
+          );
+        });
+
+        // تنفيذ جميع عمليات تحديث المخزون بالتوازي
+        await Promise.all(stockUpdates);
         console.log(`📦 Stock updated for items in order ${orderId}`);
       } else {
         console.log(`⚠️ Order ${orderId} not found in database.`);
