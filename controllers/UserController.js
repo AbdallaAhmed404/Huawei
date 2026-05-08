@@ -68,28 +68,28 @@ const paymobWebhook = async (req, res) => {
         const hmac = req.query.hmac;
         const data = req.body.obj;
 
-        // 1. حساب الـ HMAC للتأكد من صحة البيانات (Security)
-        const stringToHash = 
-            data.amount_cents +
-            data.created_at +
-            data.currency +
-            data.error_occured +
-            data.has_parent_transaction +
-            data.id +
-            data.integration_id +
-            data.is_3d_secure +
-            data.is_auth +
-            data.is_capture +
-            data.is_refunded +
-            data.is_standalone_payment +
-            data.is_voided +
-            data.order.id +
-            data.owner +
-            data.pending +
-            data.source_data.pan +
-            data.source_data.sub_type +
-            data.source_data.type +
-            data.success;
+        // التعديل المطلوب لضمان مطابقة التوقيع الرقمي
+const stringToHash = 
+    (data.amount_cents?.toString() || "") +
+    (data.created_at?.toString() || "") +
+    (data.currency?.toString() || "") +
+    (data.error_occured?.toString() || "") +
+    (data.has_parent_transaction?.toString() || "") +
+    (data.id?.toString() || "") +
+    (data.integration_id?.toString() || "") +
+    (data.is_3d_secure?.toString() || "") +
+    (data.is_auth?.toString() || "") +
+    (data.is_capture?.toString() || "") +
+    (data.is_refunded?.toString() || "") +
+    (data.is_standalone_payment?.toString() || "") +
+    (data.is_voided?.toString() || "") +
+    (data.order.id?.toString() || "") +
+    (data.owner?.toString() || "") +
+    (data.pending?.toString() || "") +
+    (data.source_data.pan?.toString() || "") +
+    (data.source_data.sub_type?.toString() || "") +
+    (data.source_data.type?.toString() || "") +
+    (data.success?.toString() || ""); // تحويل true/false لنصوص "true"/"false"
 
         const hashedHmac = crypto
             .createHmac('sha512', process.env.PAYMOB_HMAC_SECRET)
