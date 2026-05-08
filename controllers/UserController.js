@@ -19,6 +19,7 @@ const payWithPaymob = async (req, res) => {
         currency: "OMR",
         payment_methods: [parseInt(process.env.PAYMOB_INTEGRATION_ID)],
         billing_data: {
+          extra_description: orderId.toString(),
           first_name: customer_data.first_name,
           last_name: customer_data.last_name || "NA",
           phone_number: customer_data.phone,
@@ -30,7 +31,7 @@ const payWithPaymob = async (req, res) => {
           building: "NA",
           floor: "NA",
           state: "NA",
-          extra_description: orderId
+          
         },
         // الروابط دي اختيارية لو عايز تتحكم في الرجوع للموقع
         "redirection_url": "https://huaweioman.com/order-success",
