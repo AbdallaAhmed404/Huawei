@@ -18,7 +18,7 @@ const payWithPaymob = async (req, res) => {
         amount: amount_cents, // المبلغ بالبيسة (الريال العماني = 1000 بيسة)
         currency: "OMR",
         payment_methods: [parseInt(process.env.PAYMOB_INTEGRATION_ID)],
-        merchant_order_id: orderId,
+        extra_description: orderId,
         billing_data: {
           first_name: customer_data.first_name,
           last_name: customer_data.last_name || "NA",
@@ -31,10 +31,6 @@ const payWithPaymob = async (req, res) => {
           building: "NA",
           floor: "NA",
           state: "NA"
-        },
-        // وأرسله هنا أيضاً لزيادة التأكيد في سجلات Paymob
-        extras: {
-          ee_order_id: orderId
         },
         // الروابط دي اختيارية لو عايز تتحكم في الرجوع للموقع
         "redirection_url": "https://huaweioman.com/order-success",
@@ -70,8 +66,8 @@ const paymobWebhook = async (req, res) => {
   try {
     const hmac = req.query.hmac;
     const data = req.body.obj;
-    const orderId = data.order.merchant_order_id || data.order.extra_description || (data.order.extras && data.order.extras.ee_order_id);
-    console.log("Received Order ID from Paymob:", data.order.merchant_order_id);
+    const orderId = data.order.extra_description;
+    console.log("Received Order ID from Paymob:", orderId);
     // التعديل المطلوب لضمان مطابقة التوقيع الرقمي
     const stringToHash =
       (data.amount_cents?.toString() || "") +
