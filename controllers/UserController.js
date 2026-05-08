@@ -10,7 +10,7 @@ const crypto = require('crypto');
 const payWithPaymob = async (req, res) => {
   try {
     const { amount_cents, customer_data, orderId } = req.body;
-    
+
     // طلب الـ Intention (خطوة واحدة فقط)
     const response = await axios.post(
       'https://oman.paymob.com/v1/intention/',
@@ -31,6 +31,10 @@ const payWithPaymob = async (req, res) => {
           building: "NA",
           floor: "NA",
           state: "NA"
+        },
+        // وأرسله هنا أيضاً لزيادة التأكيد في سجلات Paymob
+        extras: {
+          ee_order_id: orderId
         },
         // الروابط دي اختيارية لو عايز تتحكم في الرجوع للموقع
         "redirection_url": "https://huaweioman.com/order-success",
@@ -66,6 +70,7 @@ const paymobWebhook = async (req, res) => {
   try {
     const hmac = req.query.hmac;
     const data = req.body.obj;
+    const orderId = data.order.merchant_order_id || data.order.extra_description || (data.order.extras && data.order.extras.ee_order_id);
     console.log("Received Order ID from Paymob:", data.order.merchant_order_id);
     // التعديل المطلوب لضمان مطابقة التوقيع الرقمي
     const stringToHash =
@@ -104,7 +109,6 @@ const paymobWebhook = async (req, res) => {
     if (data.success === true) {
       // ملاحظة هامة جداً:
       // في طلب الـ Intention، لازم تبعت الـ _id بتاع الاوردر في الـ merchant_order_id
-      const orderId = data.order.merchant_order_id;
 
       // 3. تحديث الطلب في MongoDB
       const updatedOrder = await OrderModel.findByIdAndUpdate(
