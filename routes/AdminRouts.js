@@ -4,8 +4,15 @@ const isAdmin = require('../middlewares/isAdmin');
 const { getUploadUrl,getAllOrders,updateOrderStatus,deleteOrder,adminRegister,updateAdminPassword, AddProduct, AllProduct, 
         UpdateProduct, DeleteProduct,adminLogin,getProductsSortedBySoldCount,getSliders,addSlider,deleteSlider,getCategories,updateMainCategoryIcon,
         updateSubCategoryIcon,getAllCoupons,createCoupon,deleteCoupon,validateCoupon,zero,getPopup,updatePopup,getProductGallery,upsertProductGallery,
-        deleteProductGallery,AddProductGallery,getStats,trackVisit } = require('../controllers/AdminController')
+        deleteProductGallery,AddProductGallery,getStats,trackVisit ,addAdmin,getAllAdmins,deleteAdmin,updateAdmin} = require('../controllers/AdminController')
 
+AdminRouter.post('/add', addAdmin);
+
+AdminRouter.get('/all', getAllAdmins);
+
+AdminRouter.put('/update/:id', updateAdmin);
+
+AdminRouter.delete('/delete/:id',  deleteAdmin);
         // المسار ده هيكون: POST /api/analytics/track-visit
 AdminRouter.post('/hit', trackVisit);
 

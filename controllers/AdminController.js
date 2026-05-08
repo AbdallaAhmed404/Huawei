@@ -3,7 +3,7 @@ const { deleteFileFromR2 } = require('../middlewares/r2Upload');
 const { PutObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const { S3Client } = require("@aws-sdk/client-s3");
-const AdminModel = require('../models/AdminModel');
+const Admin = require('../models/AdminModel');
 const bcrypt = require('bcryptjs');
 const customError = require('../customError');
 const jwt = require('jsonwebtoken');
@@ -129,6 +129,71 @@ const deleteOrder = async (req, res) => {
   }
 };
 
+const addAdmin = async (req, res) => {
+    try {
+        const { email, password, isActive } = req.body;
+
+        // التحقق إذا كان الإيميل موجود مسبقاً
+        const existingAdmin = await Admin.findOne({ email });
+        if (existingAdmin) return res.status(400).json({ message: "Email already exists" });
+
+        // تشفير كلمة المرور
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const newAdmin = new Admin({
+            email,
+            password: hashedPassword,
+            isActive: isActive !== undefined ? isActive : true
+        });
+
+        await newAdmin.save();
+        res.status(201).json({ message: "Admin created successfully" });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// 2. جلب جميع المديرين
+const getAllAdmins = async (req, res) => {
+    try {
+        const admins = await Admin.find().select('-password'); // جلب البيانات بدون كلمة المرور
+        res.status(200).json(admins);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// 3. تحديث بيانات أدمن (إيميل، باسورد، أو حالة النشاط)
+const updateAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { email, password, isActive } = req.body;
+        
+        let updateData = { email, isActive };
+
+        // لو الأدمن غير الباسورد، نشفره قبل التحديث
+        if (password) {
+            updateData.password = await bcrypt.hash(password, 10);
+        }
+
+        const updatedAdmin = await Admin.findByIdAndUpdate(id, updateData, { new: true });
+        res.status(200).json({ message: "Admin updated successfully", updatedAdmin });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// 4. حذف أدمن
+const deleteAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await Admin.findByIdAndDelete(id);
+        res.status(200).json({ message: "Admin deleted successfully" });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 const adminRegister = async (req, res, next) => {
     try {
         const { email, password } = req.body;
@@ -171,37 +236,47 @@ const adminLogin = async (req, res, next) => {
     const { email, password } = req.body;
 
     try {
-        const admin = await AdminModel.findOne({ email });
+        const admin = await Admin.findOne({ email });
 
         if (!admin) {
             return res.status(401).json({ message: 'Invalid admin credentials' });
         }
 
-        // 3. مقارنة كلمة المرور المدخلة مع المشفرة في قاعدة البيانات
+        // --- التعديل الجديد: التحقق إذا كان الحساب نشطاً ---
+        if (admin.isActive === false) {
+            return res.status(403).json({ 
+                message: 'Your account is deactivated. Please contact the super admin.' 
+            });
+        }
+
+        // مقارنة كلمة المرور
         const isMatch = await bcrypt.compare(password, admin.password);
 
         if (!isMatch) {
             return res.status(401).json({ message: 'Invalid admin credentials' });
         }
 
-        // 4. إنشاء التوكن في حالة نجاح المطابقة
+        // إنشاء التوكن
         const token = jwt.sign(
-            { id: admin._id, role: 'admin' }, 
+            { id: admin._id, role: admin.role }, 
             process.env.JWT_SECRET || 'key',
-            { expiresIn: '1d' } // يفضل إضافة وقت لانتهاء التوكن
+            { expiresIn: '1d' }
         );
 
         res.status(200).json({ 
             message: 'Admin logged in successfully', 
-            token 
+            token,
+            // إرسال بيانات إضافية للفرونت إند (اختياري)
+            admin: {
+                email: admin.email,
+                role: admin.role
+            }
         });
 
     } catch (err) {
         console.error("Admin login error:", err);
-        return next(customError({
-            statusCode: 500,
-            message: "Failed to login admin"
-        }));
+        // تأكد أن دالة customError مستوردة بشكل صحيح
+        return res.status(500).json({ message: "Failed to login admin" });
     }
 };
 
@@ -830,5 +905,9 @@ module.exports = {
     deleteProductGallery,
     AddProductGallery,
     trackVisit,
-    getStats
+    getStats,
+    addAdmin,
+    getAllAdmins,
+    deleteAdmin,
+    updateAdmin
 };
