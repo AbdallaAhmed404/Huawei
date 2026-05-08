@@ -123,25 +123,27 @@ const paymobWebhook = async (req, res) => {
       );
 
       if (updatedOrder) {
-        console.log(`✅ Order ${orderId} updated to Processing and Paid.`);
+        // --- 1. تحديث الستوك (الكود اللي عملناه) ---
         const stockUpdates = updatedOrder.items.map(item => {
           return ProductModel.updateOne(
-            {
-              _id: item.productId,
-              "colors.colorCode": item.colorCode
-            },
-            {
-              $inc: {
-                "colors.$.count": -item.quantity,
-                "countInStock": -item.quantity
-              }
-            }
+            { _id: item.productId, "colors.colorCode": item.colorCode },
+            { $inc: { "colors.$.count": -item.quantity, "countInStock": -item.quantity } }
           );
         });
 
-        // تنفيذ جميع عمليات تحديث المخزون بالتوازي
+        // --- 2. تحديث الكوبون (الجزء الجديد) ---
+        // تأكد إنك حافظ الـ code بتاع الكوبون في الـ OrderSchema
+        if (updatedOrder.appliedCouponCode) {
+          stockUpdates.push(
+            mongoose.model('Coupon').updateOne(
+              { code: updatedOrder.appliedCouponCode },
+              { $inc: { usedCount: 1 } } // زيادة عدد الاستخدامات بـ 1
+            )
+          );
+        }
+
         await Promise.all(stockUpdates);
-        console.log(`📦 Stock updated for items in order ${orderId}`);
+        console.log(`✅ Stock and Coupon updated for Order: ${orderId}`);
       } else {
         console.log(`⚠️ Order ${orderId} not found in database.`);
       }
