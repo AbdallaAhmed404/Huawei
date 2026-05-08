@@ -195,41 +195,41 @@ const deleteAdmin = async (req, res) => {
 };
 
 const adminRegister = async (req, res, next) => {
-    try {
-        const { email, password } = req.body;
+    // try {
+    //     const { email, password } = req.body;
 
-        if (!email || !password) {
-            return res.status(400).json({ message: "All fields are required" });
-        }
+    //     if (!email || !password) {
+    //         return res.status(400).json({ message: "All fields are required" });
+    //     }
 
-        const exists = await AdminModel.findOne({ email });
-        if (exists) {
-            return res.status(400).json({ message: "Admin already exists" });
-        }
+    //     const exists = await AdminModel.findOne({ email });
+    //     if (exists) {
+    //         return res.status(400).json({ message: "Admin already exists" });
+    //     }
 
-        // 1. تشفير كلمة المرور (Hashing)
-        const saltRounds = 10;
-        const hashedPassword = await bcrypt.hash(password, saltRounds);
+    //     // 1. تشفير كلمة المرور (Hashing)
+    //     const saltRounds = 10;
+    //     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-        // 2. حفظ الأدمن بكلمة المرور المشفرة
-        const newAdmin = new AdminModel({ 
-            email, 
-            password: hashedPassword 
-        });
+    //     // 2. حفظ الأدمن بكلمة المرور المشفرة
+    //     const newAdmin = new AdminModel({ 
+    //         email, 
+    //         password: hashedPassword 
+    //     });
         
-        await newAdmin.save();
+    //     await newAdmin.save();
 
-        res.status(201).json({
-            message: "Admin registered successfully",
-        });
+    //     res.status(201).json({
+    //         message: "Admin registered successfully",
+    //     });
 
-    } catch (err) {
-        console.error("Admin register error:", err);
-        return next(customError({
-            statusCode: 500,
-            message: "Failed to register admin"
-        }));
-    }
+    // } catch (err) {
+    //     console.error("Admin register error:", err);
+    //     return next(customError({
+    //         statusCode: 500,
+    //         message: "Failed to register admin"
+    //     }));
+    // }
 };
 
 const adminLogin = async (req, res, next) => {
