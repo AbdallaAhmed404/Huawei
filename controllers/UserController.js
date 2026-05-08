@@ -5,54 +5,133 @@ const ContactModel = require("../models/ContactModel");
 const axios = require('axios');
 const User = require('../models/UserModel');
 const bcrypt = require('bcryptjs');
-
+const crypto = require('crypto');
 
 const payWithPaymob = async (req, res) => {
     try {
-        const { amount_cents, customer_data } = req.body; 
+        const { amount_cents, customer_data, orderId } = req.body;
 
-        // الخطوة 1: الـ Authentication
-        const authResponse = await axios.post('https://accept.paymob.com/api/auth/tokens', {
-            api_key: process.env.PAYMOB_API_KEY
-        });
-        const token = authResponse.data.token;
-
-        // الخطوة 2: تسجيل الطلب
-        const orderResponse = await axios.post('https://accept.paymob.com/api/ecommerce/orders', {
-            auth_token: token,
-            delivery_needed: "false",
-            amount_cents: amount_cents, // السعر بالقرش (مثلاً 10000 يعني 100 ريال)
-            currency: "OMR",
-            items: []
-        });
-        const orderId = orderResponse.data.id;
-
-        // الخطوة 3: الحصول على الـ Payment Token
-        const paymentKeyResponse = await axios.post('https://accept.paymob.com/api/acceptance/payment_keys', {
-            auth_token: token,
-            amount_cents: amount_cents,
-            expiration: 3600,
-            order_id: orderId,
-            billing_data: {
-                apartment: "NA", email: customer_data.email, floor: "NA",
-                first_name: customer_data.first_name, street: customer_data.street,
-                building: "NA", phone_number: customer_data.phone,
-                shipping_method: "NA", postal_code: "NA", city: "NA",
-                country: "OM", last_name: "NA", state: "NA"
+        // طلب الـ Intention (خطوة واحدة فقط)
+        const response = await axios.post(
+            'https://oman.paymob.com/v1/intention/',
+            {
+                amount: amount_cents, // المبلغ بالبيسة (الريال العماني = 1000 بيسة)
+                currency: "OMR",
+                payment_methods: [parseInt(process.env.PAYMOB_INTEGRATION_ID)],
+                billing_data: {
+                    first_name: customer_data.first_name,
+                    last_name: customer_data.last_name || "NA",
+                    phone_number: customer_data.phone,
+                    email: customer_data.email,
+                    country: "OM",
+                    city: "NA",
+                    street: "NA",
+                    apartment: "NA",
+                    building: "NA",
+                    floor: "NA",
+                    state: "NA"
+                },extras: {
+                    merchant_order_id: orderId // ده اللي الـ Webhook هيستخدمه عشان يعمل FindById
+                },
+                // الروابط دي اختيارية لو عايز تتحكم في الرجوع للموقع
+                "redirection_url": "https://huaweioman.com/order-success", 
+                "notification_url": "https://api.huaweioman.com/user/paymob-webhook" 
             },
-            currency: "OMR",
-            integration_id: process.env.PAYMOB_INTEGRATION_ID
-        });
+            {
+                headers: {
+                    'Authorization': `Token ${process.env.PAYMOB_SECRET_KEY}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
 
-        const paymentToken = paymentKeyResponse.data.token;
-        
-        // نبعت الرابط الجاهز للفرونت اند
-        const iframeUrl = `https://accept.paymob.com/api/acceptance/iframes/${process.env.PAYMOB_IFRAME_ID}?payment_token=${paymentToken}`;
-        res.json({ url: iframeUrl });
+        // الرابط الموحد (Unified Checkout)
+        // بنستخدم الـ client_secret اللي رجع من الرد والـ public key بتاعنا
+        const clientSecret = response.data.client_secret;
+        const checkoutUrl = `https://oman.paymob.com/unifiedcheckout/?publicKey=${process.env.PAYMOB_PUBLIC_KEY}&clientSecret=${clientSecret}`;
+
+        // نبعت الرابط للفرونت اند عشان يفتح صفحة الدفع
+        res.json({ url: checkoutUrl });
 
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Payment initialization failed" });
+        console.error("Paymob Error:", error.response ? error.response.data : error.message);
+        res.status(500).json({ 
+            message: "Initialization failed", 
+            error: error.response ? error.response.data : error.message 
+        });
+    }
+};
+
+
+const paymobWebhook = async (req, res) => {
+    try {
+        const hmac = req.query.hmac;
+        const data = req.body.obj;
+
+        // 1. حساب الـ HMAC للتأكد من صحة البيانات (Security)
+        const stringToHash = 
+            data.amount_cents +
+            data.created_at +
+            data.currency +
+            data.error_occured +
+            data.has_parent_transaction +
+            data.id +
+            data.integration_id +
+            data.is_3d_secure +
+            data.is_auth +
+            data.is_capture +
+            data.is_refunded +
+            data.is_standalone_payment +
+            data.is_voided +
+            data.order.id +
+            data.owner +
+            data.pending +
+            data.source_data.pan +
+            data.source_data.sub_type +
+            data.source_data.type +
+            data.success;
+
+        const hashedHmac = crypto
+            .createHmac('sha512', process.env.PAYMOB_HMAC_SECRET)
+            .update(stringToHash)
+            .digest('hex');
+
+        if (hmac !== hashedHmac) {
+            console.log("❌ Invalid HMAC Signature");
+            return res.status(401).send('Invalid HMAC');
+        }
+
+        // 2. التحقق من نجاح العملية (Success === true)
+        if (data.success === true) {
+            // ملاحظة هامة جداً:
+            // في طلب الـ Intention، لازم تبعت الـ _id بتاع الاوردر في الـ merchant_order_id
+            const orderId = data.order.merchant_order_id;
+
+            // 3. تحديث الطلب في MongoDB
+            const updatedOrder = await OrderModel.findByIdAndUpdate(
+                orderId,
+                { 
+                    status: "Processing",      // تم التحويل حسب طلبك
+                    paymentStatus: "Paid"       // تم التحويل لمدفوع
+                },
+                { new: true }
+            );
+
+            if (updatedOrder) {
+                console.log(`✅ Order ${orderId} updated to Processing and Paid.`);
+            } else {
+                console.log(`⚠️ Order ${orderId} not found in database.`);
+            }
+        } else {
+            console.log(`❌ Payment failed for transaction: ${data.id}`);
+        }
+
+        // 4. الرد بـ 200 ضروري جداً عشان Paymob ميفضلش يبعت الطلب تاني
+        res.status(200).send('OK');
+
+    } catch (error) {
+        console.error("Webhook Error:", error.message);
+        res.status(500).send('Internal Server Error');
     }
 };
 
@@ -178,7 +257,7 @@ const makeOrder = async (req, res) => {
     res.status(201).json({
       success: true,
       message: "Order saved successfully!",
-      orderId: newOrder._id,
+      _id: newOrder._id,
     });
   } catch (error) {
     console.error("❌ Error saving order:", error);
@@ -273,5 +352,6 @@ module.exports = {
   payWithPaymob,
   register,
   login,
-  getUserProfile
+  getUserProfile,
+  paymobWebhook
 };
