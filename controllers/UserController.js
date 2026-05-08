@@ -18,9 +18,9 @@ const payWithPaymob = async (req, res) => {
         amount: amount_cents, // المبلغ بالبيسة (الريال العماني = 1000 بيسة)
         currency: "OMR",
         payment_methods: [parseInt(process.env.PAYMOB_INTEGRATION_ID)],
+        merchant_order_id: orderId.toString(),
         extra_description: orderId.toString(),
         billing_data: {
-          extra_description: orderId.toString(),
           first_name: customer_data.first_name,
           last_name: customer_data.last_name || "NA",
           phone_number: customer_data.phone,
@@ -70,9 +70,9 @@ const paymobWebhook = async (req, res) => {
     const data = req.body.obj;
     console.log("Received Order ID from Paymob:", data);
     const orderId = 
-      data.payment_key_claims?.billing_data?.extra_description || 
-      data.order?.shipping_data?.extra_description ||
-      data.order?.merchant_order_id;
+  data.order?.merchant_order_id || 
+  data.payment_key_claims?.extra?.merchant_order_id ||
+  data.payment_key_claims?.billing_data?.extra_description;
     console.log("Received Order ID from Paymob:", orderId);
     // التعديل المطلوب لضمان مطابقة التوقيع الرقمي
     const stringToHash =
