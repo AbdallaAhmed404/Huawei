@@ -10,7 +10,7 @@ const crypto = require('crypto');
 const payWithPaymob = async (req, res) => {
   try {
     const { amount_cents, customer_data, orderId } = req.body;
-
+    console.log(orderId)
     // طلب الـ Intention (خطوة واحدة فقط)
     const response = await axios.post(
       'https://oman.paymob.com/v1/intention/',
