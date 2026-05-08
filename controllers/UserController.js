@@ -72,15 +72,9 @@ const paymobWebhook = async (req, res) => {
     const hmac = req.query.hmac;
     const data = req.body.obj;
     console.log("Received Order ID from Paymob:", data);
-    let orderId = 
-      data.payment_key_claims?.extra?.merchant_order_id || 
-      data.payment_key_claims?.billing_data?.extra_description ||
-      data.order?.merchant_order_id;
+    const orderId = data.payment_key_claims?.extra?.ee_order_id;
 
-    // لو لسه "NA" أو null.. هنستخدم "الخطة الانتحارية" وهي جلب الـ ID من الـ Metadata لو موجودة
-    if (!orderId || orderId === "NA" || orderId === "null") {
-        orderId = data.payment_key_claims?.metadata?.order_id;
-    }
+   
     console.log("Received Order ID from Paymob:", orderId);
     // التعديل المطلوب لضمان مطابقة التوقيع الرقمي
     const stringToHash =
