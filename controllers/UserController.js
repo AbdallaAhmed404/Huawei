@@ -18,7 +18,6 @@ const payWithPaymob = async (req, res) => {
         amount: amount_cents, // المبلغ بالبيسة (الريال العماني = 1000 بيسة)
         currency: "OMR",
         payment_methods: [parseInt(process.env.PAYMOB_INTEGRATION_ID)],
-        extra_description: orderId,
         billing_data: {
           first_name: customer_data.first_name,
           last_name: customer_data.last_name || "NA",
@@ -30,7 +29,8 @@ const payWithPaymob = async (req, res) => {
           apartment: "NA",
           building: "NA",
           floor: "NA",
-          state: "NA"
+          state: "NA",
+          extra_description: orderId
         },
         // الروابط دي اختيارية لو عايز تتحكم في الرجوع للموقع
         "redirection_url": "https://huaweioman.com/order-success",
