@@ -31,12 +31,12 @@ const payWithPaymob = async (req, res) => {
           building: "NA",
           floor: "NA",
           state: "NA",
-          
+
         },
-    // ضيف الـ extras هنا برضه احتياطي
-    extras: {
-        ee_order_id: orderId.toString()
-    },
+        // ضيف الـ extras هنا برضه احتياطي
+        extras: {
+          ee_order_id: orderId.toString()
+        },
         // الروابط دي اختيارية لو عايز تتحكم في الرجوع للموقع
         "redirection_url": "https://huaweioman.com/order-success",
         "notification_url": "https://api.huaweioman.com/user/paymob-webhook"
@@ -74,7 +74,7 @@ const paymobWebhook = async (req, res) => {
     console.log("Received Order ID from Paymob:", data);
     const orderId = data.payment_key_claims?.extra?.ee_order_id;
 
-   
+
     console.log("Received Order ID from Paymob:", orderId);
     // التعديل المطلوب لضمان مطابقة التوقيع الرقمي
     const stringToHash =
@@ -111,8 +111,6 @@ const paymobWebhook = async (req, res) => {
 
     // 2. التحقق من نجاح العملية (Success === true)
     if (data.success === true) {
-      // ملاحظة هامة جداً:
-      // في طلب الـ Intention، لازم تبعت الـ _id بتاع الاوردر في الـ merchant_order_id
 
       // 3. تحديث الطلب في MongoDB
       const updatedOrder = await OrderModel.findByIdAndUpdate(
@@ -126,6 +124,24 @@ const paymobWebhook = async (req, res) => {
 
       if (updatedOrder) {
         console.log(`✅ Order ${orderId} updated to Processing and Paid.`);
+        const stockUpdates = updatedOrder.items.map(item => {
+          return ProductModel.updateOne(
+            {
+              _id: item.productId,
+              "colors.colorCode": item.colorCode
+            },
+            {
+              $inc: {
+                "colors.$.count": -item.quantity,
+                "countInStock": -item.quantity
+              }
+            }
+          );
+        });
+
+        // تنفيذ جميع عمليات تحديث المخزون بالتوازي
+        await Promise.all(stockUpdates);
+        console.log(`📦 Stock updated for items in order ${orderId}`);
       } else {
         console.log(`⚠️ Order ${orderId} not found in database.`);
       }
