@@ -66,6 +66,7 @@ const paymobWebhook = async (req, res) => {
   try {
     const hmac = req.query.hmac;
     const data = req.body.obj;
+    console.log("Received Order ID from Paymob:", data);
     const orderId = data.order.extra_description;
     console.log("Received Order ID from Paymob:", orderId);
     // التعديل المطلوب لضمان مطابقة التوقيع الرقمي
