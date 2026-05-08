@@ -8,198 +8,197 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
 const payWithPaymob = async (req, res) => {
-    try {
-        const { amount_cents, customer_data, orderId } = req.body;
+  try {
+    const { amount_cents, customer_data, orderId } = req.body;
 
-        // طلب الـ Intention (خطوة واحدة فقط)
-        const response = await axios.post(
-            'https://oman.paymob.com/v1/intention/',
-            {
-                amount: amount_cents, // المبلغ بالبيسة (الريال العماني = 1000 بيسة)
-                currency: "OMR",
-                payment_methods: [parseInt(process.env.PAYMOB_INTEGRATION_ID)],
-                billing_data: {
-                    first_name: customer_data.first_name,
-                    last_name: customer_data.last_name || "NA",
-                    phone_number: customer_data.phone,
-                    email: customer_data.email,
-                    country: "OM",
-                    city: "NA",
-                    street: "NA",
-                    apartment: "NA",
-                    building: "NA",
-                    floor: "NA",
-                    state: "NA"
-                },extras: {
-                    merchant_order_id: orderId // ده اللي الـ Webhook هيستخدمه عشان يعمل FindById
-                },
-                // الروابط دي اختيارية لو عايز تتحكم في الرجوع للموقع
-                "redirection_url": "https://huaweioman.com/order-success", 
-                "notification_url": "https://api.huaweioman.com/user/paymob-webhook" 
-            },
-            {
-                headers: {
-                    'Authorization': `Token ${process.env.PAYMOB_SECRET_KEY}`,
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
+    // طلب الـ Intention (خطوة واحدة فقط)
+    const response = await axios.post(
+      'https://oman.paymob.com/v1/intention/',
+      {
+        amount: amount_cents, // المبلغ بالبيسة (الريال العماني = 1000 بيسة)
+        currency: "OMR",
+        payment_methods: [parseInt(process.env.PAYMOB_INTEGRATION_ID)],
+        merchant_order_id: orderId,
+        billing_data: {
+          first_name: customer_data.first_name,
+          last_name: customer_data.last_name || "NA",
+          phone_number: customer_data.phone,
+          email: customer_data.email,
+          country: "OM",
+          city: "NA",
+          street: "NA",
+          apartment: "NA",
+          building: "NA",
+          floor: "NA",
+          state: "NA"
+        },
+        // الروابط دي اختيارية لو عايز تتحكم في الرجوع للموقع
+        "redirection_url": "https://huaweioman.com/order-success",
+        "notification_url": "https://api.huaweioman.com/user/paymob-webhook"
+      },
+      {
+        headers: {
+          'Authorization': `Token ${process.env.PAYMOB_SECRET_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
 
-        // الرابط الموحد (Unified Checkout)
-        // بنستخدم الـ client_secret اللي رجع من الرد والـ public key بتاعنا
-        const clientSecret = response.data.client_secret;
-        const checkoutUrl = `https://oman.paymob.com/unifiedcheckout/?publicKey=${process.env.PAYMOB_PUBLIC_KEY}&clientSecret=${clientSecret}`;
+    // الرابط الموحد (Unified Checkout)
+    // بنستخدم الـ client_secret اللي رجع من الرد والـ public key بتاعنا
+    const clientSecret = response.data.client_secret;
+    const checkoutUrl = `https://oman.paymob.com/unifiedcheckout/?publicKey=${process.env.PAYMOB_PUBLIC_KEY}&clientSecret=${clientSecret}`;
 
-        // نبعت الرابط للفرونت اند عشان يفتح صفحة الدفع
-        res.json({ url: checkoutUrl });
+    // نبعت الرابط للفرونت اند عشان يفتح صفحة الدفع
+    res.json({ url: checkoutUrl });
 
-    } catch (error) {
-        console.error("Paymob Error:", error.response ? error.response.data : error.message);
-        res.status(500).json({ 
-            message: "Initialization failed", 
-            error: error.response ? error.response.data : error.message 
-        });
-    }
+  } catch (error) {
+    console.error("Paymob Error:", error.response ? error.response.data : error.message);
+    res.status(500).json({
+      message: "Initialization failed",
+      error: error.response ? error.response.data : error.message
+    });
+  }
 };
 
 
 const paymobWebhook = async (req, res) => {
-    try {
-        const hmac = req.query.hmac;
-        const data = req.body.obj;
+  try {
+    const hmac = req.query.hmac;
+    const data = req.body.obj;
 
-        // التعديل المطلوب لضمان مطابقة التوقيع الرقمي
-const stringToHash = 
-    (data.amount_cents?.toString() || "") +
-    (data.created_at?.toString() || "") +
-    (data.currency?.toString() || "") +
-    (data.error_occured?.toString() || "") +
-    (data.has_parent_transaction?.toString() || "") +
-    (data.id?.toString() || "") +
-    (data.integration_id?.toString() || "") +
-    (data.is_3d_secure?.toString() || "") +
-    (data.is_auth?.toString() || "") +
-    (data.is_capture?.toString() || "") +
-    (data.is_refunded?.toString() || "") +
-    (data.is_standalone_payment?.toString() || "") +
-    (data.is_voided?.toString() || "") +
-    (data.order.id?.toString() || "") +
-    (data.owner?.toString() || "") +
-    (data.pending?.toString() || "") +
-    (data.source_data.pan?.toString() || "") +
-    (data.source_data.sub_type?.toString() || "") +
-    (data.source_data.type?.toString() || "") +
-    (data.success?.toString() || ""); // تحويل true/false لنصوص "true"/"false"
+    // التعديل المطلوب لضمان مطابقة التوقيع الرقمي
+    const stringToHash =
+      (data.amount_cents?.toString() || "") +
+      (data.created_at?.toString() || "") +
+      (data.currency?.toString() || "") +
+      (data.error_occured?.toString() || "") +
+      (data.has_parent_transaction?.toString() || "") +
+      (data.id?.toString() || "") +
+      (data.integration_id?.toString() || "") +
+      (data.is_3d_secure?.toString() || "") +
+      (data.is_auth?.toString() || "") +
+      (data.is_capture?.toString() || "") +
+      (data.is_refunded?.toString() || "") +
+      (data.is_standalone_payment?.toString() || "") +
+      (data.is_voided?.toString() || "") +
+      (data.order.id?.toString() || "") +
+      (data.owner?.toString() || "") +
+      (data.pending?.toString() || "") +
+      (data.source_data.pan?.toString() || "") +
+      (data.source_data.sub_type?.toString() || "") +
+      (data.source_data.type?.toString() || "") +
+      (data.success?.toString() || ""); // تحويل true/false لنصوص "true"/"false"
 
-        const hashedHmac = crypto
-            .createHmac('sha512', process.env.PAYMOB_HMAC_SECRET)
-            .update(stringToHash)
-            .digest('hex');
+    const hashedHmac = crypto
+      .createHmac('sha512', process.env.PAYMOB_HMAC_SECRET)
+      .update(stringToHash)
+      .digest('hex');
 
-        if (hmac !== hashedHmac) {
-            console.log("❌ Invalid HMAC Signature");
-            return res.status(401).send('Invalid HMAC');
-        }
-
-        // 2. التحقق من نجاح العملية (Success === true)
-        if (data.success === true) {
-            // ملاحظة هامة جداً:
-            // في طلب الـ Intention، لازم تبعت الـ _id بتاع الاوردر في الـ merchant_order_id
-            const orderId = data.order.merchant_order_id;
-
-            // 3. تحديث الطلب في MongoDB
-            const updatedOrder = await OrderModel.findByIdAndUpdate(
-                orderId,
-                { 
-                    status: "Processing",      // تم التحويل حسب طلبك
-                    paymentStatus: "Paid"       // تم التحويل لمدفوع
-                },
-                { new: true }
-            );
-
-            if (updatedOrder) {
-                console.log(`✅ Order ${orderId} updated to Processing and Paid.`);
-            } else {
-                console.log(`⚠️ Order ${orderId} not found in database.`);
-            }
-        } else {
-            console.log(`❌ Payment failed for transaction: ${data.id}`);
-        }
-
-        // 4. الرد بـ 200 ضروري جداً عشان Paymob ميفضلش يبعت الطلب تاني
-        res.status(200).send('OK');
-
-    } catch (error) {
-        console.error("Webhook Error:", error.message);
-        res.status(500).send('Internal Server Error');
+    if (hmac !== hashedHmac) {
+      console.log("❌ Invalid HMAC Signature");
+      return res.status(401).send('Invalid HMAC');
     }
+
+    // 2. التحقق من نجاح العملية (Success === true)
+    if (data.success === true) {
+      // ملاحظة هامة جداً:
+      // في طلب الـ Intention، لازم تبعت الـ _id بتاع الاوردر في الـ merchant_order_id
+      const orderId = data.order.merchant_order_id;
+
+      // 3. تحديث الطلب في MongoDB
+      const updatedOrder = await OrderModel.findByIdAndUpdate(
+        orderId,
+        {
+          status: "Processing",      // تم التحويل حسب طلبك
+          paymentStatus: "Paid"       // تم التحويل لمدفوع
+        },
+        { new: true }
+      );
+
+      if (updatedOrder) {
+        console.log(`✅ Order ${orderId} updated to Processing and Paid.`);
+      } else {
+        console.log(`⚠️ Order ${orderId} not found in database.`);
+      }
+    } else {
+      console.log(`❌ Payment failed for transaction: ${data.id}`);
+    }
+
+    // 4. الرد بـ 200 ضروري جداً عشان Paymob ميفضلش يبعت الطلب تاني
+    res.status(200).send('OK');
+
+  } catch (error) {
+    console.error("Webhook Error:", error.message);
+    res.status(500).send('Internal Server Error');
+  }
 };
 
 
 const register = async (req, res) => {
-    try {
-        const { firstName, lastName, email, password, phone, city, district } = req.body;
+  try {
+    const { firstName, lastName, email, password, phone, city, district } = req.body;
 
-        // التأكد من عدم وجود المستخدم مسبقاً
-        const existingUser = await User.findOne({ email });
-        if (existingUser) {
-            return res.status(400).json({ message: "هذا البريد الإلكتروني مسجل بالفعل" });
-        }
-
-        // إنشاء المستخدم (التشفير سيتم تلقائياً في الـ Pre-save middleware بالموديل)
-        const newUser = new User({
-            firstName,
-            lastName,
-            email,
-            password,
-            phone,
-            city,
-            district
-        });
-
-        await newUser.save();
-
-        // توليد التوكن
-        const token = await newUser.generatetoken();
-
-        res.status(201).json({
-            message: "تم إنشاء الحساب بنجاح",
-            token,
-            user: newUser
-        });
-    } catch (error) {
-        res.status(500).json({ message: "خطأ في السيرفر", error: error.message });
+    // التأكد من عدم وجود المستخدم مسبقاً
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: "هذا البريد الإلكتروني مسجل بالفعل" });
     }
+
+    // إنشاء المستخدم (التشفير سيتم تلقائياً في الـ Pre-save middleware بالموديل)
+    const newUser = new User({
+      firstName,
+      lastName,
+      email,
+      password,
+      phone,
+      city,
+      district
+    });
+
+    await newUser.save();
+
+    // توليد التوكن
+    const token = await newUser.generatetoken();
+
+    res.status(201).json({
+      message: "تم إنشاء الحساب بنجاح",
+      token,
+      user: newUser
+    });
+  } catch (error) {
+    res.status(500).json({ message: "خطأ في السيرفر", error: error.message });
+  }
 };
 
 // 2. تسجيل الدخول
 const login = async (req, res) => {
-    try {
-        const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
 
-        // البحث عن المستخدم
-        const user = await User.findOne({ email });
-        if (!user) {
-            return res.status(401).json({ message: "البريد الإلكتروني أو كلمة المرور غير صحيحة" });
-        }
-
-        // مقارنة كلمة المرور
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(401).json({ message: "البريد الإلكتروني أو كلمة المرور غير صحيحة" });
-        }
-
-        // توليد التوكن
-        const token = await user.generatetoken();
-
-        res.status(200).json({
-            message: "تم تسجيل الدخول بنجاح",
-            token,
-            user
-        });
-    } catch (error) {
-        res.status(500).json({ message: "خطأ في السيرفر", error: error.message });
+    // البحث عن المستخدم
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(401).json({ message: "البريد الإلكتروني أو كلمة المرور غير صحيحة" });
     }
+
+    // مقارنة كلمة المرور
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: "البريد الإلكتروني أو كلمة المرور غير صحيحة" });
+    }
+
+    // توليد التوكن
+    const token = await user.generatetoken();
+
+    res.status(200).json({
+      message: "تم تسجيل الدخول بنجاح",
+      token,
+      user
+    });
+  } catch (error) {
+    res.status(500).json({ message: "خطأ في السيرفر", error: error.message });
+  }
 };
 
 // 🧱 عرض كل المنتجات
@@ -217,25 +216,25 @@ const AllProduct = async (req, res, next) => {
 };
 
 const getUserProfile = async (req, res) => {
-    try {
-        // req.user.id يتم توفيره عادةً بواسطة الـ auth middleware بعد فك التوكن
-        const user = await User.findById(req.user.id);
+  try {
+    // req.user.id يتم توفيره عادةً بواسطة الـ auth middleware بعد فك التوكن
+    const user = await User.findById(req.user.id);
 
-        if (user) {
-            res.json({
-                firstName: user.firstName,
-                lastName: user.lastName,
-                email: user.email,
-                phone: user.phone,
-                city: user.city || 'Select City',
-                district: user.district || ''
-            });
-        } else {
-            res.status(404).json({ message: 'User not found' });
-        }
-    } catch (error) {
-        res.status(500).json({ message: 'Server error', error: error.message });
+    if (user) {
+      res.json({
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phone: user.phone,
+        city: user.city || 'Select City',
+        district: user.district || ''
+      });
+    } else {
+      res.status(404).json({ message: 'User not found' });
     }
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
 };
 
 // 🧾 استقبال الطلب من المستخدم (بدون login)
@@ -245,13 +244,13 @@ const makeOrder = async (req, res) => {
     const { userData, items, total } = req.body;
 
     // 🧾 إنشاء طلب جديد فقط بدون تحديث المخزن حالياً
-    const newOrder = new OrderModel({ 
-      userData, 
-      items, 
+    const newOrder = new OrderModel({
+      userData,
+      items,
       total,
-      status: "Pending" 
+      status: "Pending"
     });
-    
+
     await newOrder.save();
 
     res.status(201).json({
@@ -346,7 +345,7 @@ module.exports = {
   makeOrder,
   getProductById,
   getProductsByCategory,
-  addMessage, 
+  addMessage,
   getAllMessages,
   deleteMessage,
   payWithPaymob,
