@@ -19,7 +19,6 @@ const payWithPaymob = async (req, res) => {
         currency: "OMR",
         payment_methods: [parseInt(process.env.PAYMOB_INTEGRATION_ID)],
         merchant_order_id: orderId.toString(),
-        extra_description: orderId.toString(),
         billing_data: {
           first_name: customer_data.first_name,
           last_name: customer_data.last_name || "NA",
@@ -34,6 +33,10 @@ const payWithPaymob = async (req, res) => {
           state: "NA",
           
         },
+    // ضيف الـ extras هنا برضه احتياطي
+    extras: {
+        ee_order_id: orderId.toString()
+    },
         // الروابط دي اختيارية لو عايز تتحكم في الرجوع للموقع
         "redirection_url": "https://huaweioman.com/order-success",
         "notification_url": "https://api.huaweioman.com/user/paymob-webhook"
@@ -69,10 +72,15 @@ const paymobWebhook = async (req, res) => {
     const hmac = req.query.hmac;
     const data = req.body.obj;
     console.log("Received Order ID from Paymob:", data);
-    const orderId = 
-  data.order?.merchant_order_id || 
-  data.payment_key_claims?.extra?.merchant_order_id ||
-  data.payment_key_claims?.billing_data?.extra_description;
+    let orderId = 
+      data.payment_key_claims?.extra?.merchant_order_id || 
+      data.payment_key_claims?.billing_data?.extra_description ||
+      data.order?.merchant_order_id;
+
+    // لو لسه "NA" أو null.. هنستخدم "الخطة الانتحارية" وهي جلب الـ ID من الـ Metadata لو موجودة
+    if (!orderId || orderId === "NA" || orderId === "null") {
+        orderId = data.payment_key_claims?.metadata?.order_id;
+    }
     console.log("Received Order ID from Paymob:", orderId);
     // التعديل المطلوب لضمان مطابقة التوقيع الرقمي
     const stringToHash =
