@@ -10,7 +10,7 @@ const crypto = require('crypto');
 const payWithPaymob = async (req, res) => {
   try {
     const { amount_cents, customer_data, orderId } = req.body;
-
+    
     // طلب الـ Intention (خطوة واحدة فقط)
     const response = await axios.post(
       'https://oman.paymob.com/v1/intention/',
@@ -66,7 +66,7 @@ const paymobWebhook = async (req, res) => {
   try {
     const hmac = req.query.hmac;
     const data = req.body.obj;
-
+    console.log("Received Order ID from Paymob:", data.order.merchant_order_id);
     // التعديل المطلوب لضمان مطابقة التوقيع الرقمي
     const stringToHash =
       (data.amount_cents?.toString() || "") +
