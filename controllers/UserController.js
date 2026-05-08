@@ -274,6 +274,7 @@ const makeOrder = async (req, res) => {
       userData,
       items,
       total,
+      appliedCouponCode,
       status: "Pending"
     });
 
