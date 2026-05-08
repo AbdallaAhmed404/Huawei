@@ -28,6 +28,11 @@ const OrderSchema = new mongoose.Schema(
       },
     ],
     total: Number,
+
+    appliedCouponCode: { 
+      type: String, 
+      default: null 
+    },
     isGuest: { type: Boolean, default: false }, // علامة عشان تعرف هل ده طلب زائر أم مستخدم
     status: {
       type: String,
