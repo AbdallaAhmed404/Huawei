@@ -6,6 +6,7 @@ const axios = require('axios');
 const User = require('../models/UserModel');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+const Coupon = require('../models/Coupon'); // تأكد من المسار الصحيح للملف
 
 const payWithPaymob = async (req, res) => {
   try {
@@ -135,8 +136,8 @@ const paymobWebhook = async (req, res) => {
         // تأكد إنك حافظ الـ code بتاع الكوبون في الـ OrderSchema
         if (updatedOrder.appliedCouponCode) {
           stockUpdates.push(
-            mongoose.model('Coupon').updateOne(
-              { code: updatedOrder.appliedCouponCode },
+            Coupon.updateOne(
+              { code: updatedOrder.appliedCouponCode.toUpperCase() },
               { $inc: { usedCount: 1 } } // زيادة عدد الاستخدامات بـ 1
             )
           );
