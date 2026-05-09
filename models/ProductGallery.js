@@ -15,6 +15,10 @@ const productGallerySchema = new mongoose.Schema({
                 type: String, 
                 required: true // مثلاً: "Main Views", "Side Angles", "In Use"
             },
+            isGrid: {
+                type: Boolean,
+                default: false // الوضع الافتراضي هو السلايدر إلا لو اخترت Grid
+            },
             images: [
                 {
                     type: String, // روابط الصور المرفوعة على Cloudflare R2[cite: 1]
