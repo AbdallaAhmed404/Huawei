@@ -73,7 +73,7 @@ AdminRouter.get('/allpr', zero);
 
 AdminRouter.post('/updateproduct', UpdateProduct);
 
-AdminRouter.delete('/delete/:id', DeleteProduct);
+AdminRouter.delete('/deletepro/:id', DeleteProduct);
 
 AdminRouter.get('/soldcount', getProductsSortedBySoldCount);
 
