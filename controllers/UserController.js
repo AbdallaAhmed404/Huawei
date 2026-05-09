@@ -268,14 +268,16 @@ const getUserProfile = async (req, res) => {
 
 const makeOrder = async (req, res) => {
   try {
-    const { userData, items, appliedCouponCode,total } = req.body;
+    const { userData, items, appliedCouponCode,total,user, isGuest } = req.body;
 
     // 🧾 إنشاء طلب جديد فقط بدون تحديث المخزن حالياً
     const newOrder = new OrderModel({
+      user: user || null,
       userData,
       items,
       total,
       appliedCouponCode,
+      isGuest,
       status: "Pending"
     });
 
