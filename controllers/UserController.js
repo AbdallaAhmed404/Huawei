@@ -294,6 +294,37 @@ const makeOrder = async (req, res) => {
   }
 };
 
+const getUserOrders = async (req, res) => {
+    try {
+        const userId  = req.user.id; // أو استلامه من req.user إذا كنت تستخدم Middleware للتحقق
+
+        // التأكد من إرسال الـ ID
+        if (!userId) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "User ID is required" 
+            });
+        }
+
+        // البحث عن الطلبات المرتبطة بهذا المستخدم
+        // .sort({ createdAt: -1 }) لجعل الطلبات الأحدث تظهر في الأول
+        const orders = await OrderModel.find({ user: userId }).sort({ createdAt: -1 });
+
+        res.status(200).json({
+            success: true,
+            count: orders.length,
+            orders: orders
+        });
+
+    } catch (error) {
+        console.error("❌ Error fetching user orders:", error);
+        res.status(500).json({ 
+            success: false, 
+            message: "Internal server error" 
+        });
+    }
+};
+
 const getProductById = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -382,5 +413,6 @@ module.exports = {
   register,
   login,
   getUserProfile,
-  paymobWebhook
+  paymobWebhook,
+  getUserOrders
 };

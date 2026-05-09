@@ -1,8 +1,9 @@
 const express = require('express')
 const UserRouter = express.Router()
 const authorized = require('../middlewares/Authorized')
-const {paymobWebhook,register,login,getUserProfile,addMessage,deleteMessage, getAllMessages, AllProduct, makeOrder ,getProductById,getProductsByCategory,payWithPaymob} = require('../controllers/UserController')
+const {paymobWebhook,register,login,getUserProfile,addMessage,deleteMessage, getAllMessages, AllProduct, makeOrder,getUserOrders ,getProductById,getProductsByCategory,payWithPaymob} = require('../controllers/UserController')
 
+UserRouter.get("/my-orders",authorized, getUserOrders);
 UserRouter.post('/paymob-webhook', paymobWebhook);
 UserRouter.get('/profile', authorized, getUserProfile);
 UserRouter.post('/register', register);
