@@ -268,17 +268,30 @@ const getUserProfile = async (req, res) => {
 
 const makeOrder = async (req, res) => {
   try {
-    const { userData, items, appliedCouponCode,total,user, isGuest } = req.body;
+    const { userData, items, appliedCouponCode, total, user, isGuest } = req.body;
 
-    // 🧾 إنشاء طلب جديد فقط بدون تحديث المخزن حالياً
+    // مراجعة الـ items القادمة من الفرونت إند
+    // تأكد أن مصفوفة items تحتوي بالفعل على isPreOrder و depositAmount
+    const formattedItems = items.map(item => ({
+      productId: item._id,
+      name: item.name,
+      photo: item.image,
+      price: item.price,
+      quantity: item.quantity,
+      colorCode: item.colorCode,
+      isPreOrder: item.isPreOrder || false,     // حفظ الحالة
+      depositAmount: item.depositAmount || 0    // حفظ قيمة العربون
+    }));
+
     const newOrder = new OrderModel({
       user: user || null,
       userData,
-      items,
+      items: formattedItems, // استخدم المصفوفة المهيأة
       total,
       appliedCouponCode,
       isGuest,
-      status: "Pending"
+      status: "Pending",
+      paymentStatus: "Unpaid" // الحالة الافتراضية
     });
 
     await newOrder.save();

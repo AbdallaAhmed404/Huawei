@@ -39,7 +39,14 @@ const productSchema = new mongoose.Schema({
     // الهدايا المرتبطة بالمنتج
     gifts: [giftSchema], 
 
-    countInStock: { type: Number, default: 0 }
+    countInStock: { type: Number, default: 0 },
+
+    // ================= الجزء الجديد الخاص بالـ Pre-Order =================
+    preOrder: {
+        isPreOrder: { type: Boolean, default: false }, // هل متاح حجز مسبق؟
+        depositPercentage: { type: Number, default: 100 }, // نسبة العربون (الافتراضي 100% يعني دفع كامل)
+        availableUntil: { type: Date }, // تاريخ انتهاء فترة البري أوردر
+    }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Product', productSchema);

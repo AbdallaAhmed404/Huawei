@@ -319,6 +319,7 @@ const updateAdminPassword = async (req, res, next) => {
 
 
 const AddProduct = async (req, res, next) => {
+    
     try {
         // البيانات جاية جاهزة باللينكات من الفرونت
         const productData = {
@@ -333,9 +334,10 @@ const AddProduct = async (req, res, next) => {
             subCategory: req.body.subCategory,
             colors: req.body.colors, // مصفوفة {colorName, images: []}
             gifts: req.body.gifts,   // مصفوفة {name, image}
-            countInStock: req.body.countInStock
+            countInStock: req.body.countInStock,
+            // --- إضافة الجزء الجديد هنا ---
+            preOrder: req.body.preOrder
         };
-
         const newProduct = await ProductModel.create(productData);
         res.status(201).json(newProduct);
     } catch (err) {
@@ -386,7 +388,7 @@ const AllProduct = async (req, res) => {
 
 const UpdateProduct = async (req, res, next) => {
     try {
-        const { _id, name, price, description, category,variants, subCategory, image, discount, modelName, colors, gifts, installmentPrice, countInStock } = req.body;
+        const { _id, name, price, description, category,variants, subCategory, image, discount, modelName, colors, gifts, installmentPrice, countInStock, preOrder } = req.body;
 
         // 1. البحث عن المنتج باستخدام الـ _id (التنسيق الافتراضي لمونجو)
         const product = await ProductModel.findById(_id);
@@ -438,9 +440,9 @@ const UpdateProduct = async (req, res, next) => {
         product.gifts = gifts;
         product.installmentPrice = installmentPrice;
         product.countInStock = countInStock;
+        product.preOrder = preOrder;
 
         await product.save();
-        console.log("✅ تم تحديث المنتج بنجاح:", product.name);
         res.json(product);
 
     } catch (err) {

@@ -3,9 +3,9 @@ const mongoose = require("mongoose");
 const OrderSchema = new mongoose.Schema(
   {
     // الربط مع موديل المستخدم
-    user: { 
-      type: mongoose.Schema.Types.ObjectId, 
-      ref: 'User', 
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
       required: false // false عشان يسمح للـ Guest بالشراء
     },
     // بيانات العميل (سواء سجل أو لا)
@@ -24,14 +24,17 @@ const OrderSchema = new mongoose.Schema(
         photo: String,
         price: Number,
         quantity: Number,
-        colorCode: String // ضيف دي عشان إنت عندك ألوان في الفرونت إند
+        colorCode: String,
+        // --- أضف هذه الحقول هنا ---
+        isPreOrder: { type: Boolean, default: false },
+        depositAmount: { type: Number, default: 0 }
       },
     ],
     total: Number,
 
-    appliedCouponCode: { 
-      type: String, 
-      default: null 
+    appliedCouponCode: {
+      type: String,
+      default: null
     },
     isGuest: { type: Boolean, default: false }, // علامة عشان تعرف هل ده طلب زائر أم مستخدم
     status: {
