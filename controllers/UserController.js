@@ -275,7 +275,7 @@ const makeOrder = async (req, res) => {
     const formattedItems = items.map(item => ({
       productId: item._id,
       name: item.name,
-      photo: item.image,
+      photo: item.photo,
       price: item.price,
       quantity: item.quantity,
       colorCode: item.colorCode,
