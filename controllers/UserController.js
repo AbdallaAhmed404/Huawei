@@ -268,7 +268,7 @@ const getUserProfile = async (req, res) => {
 
 const makeOrder = async (req, res) => {
   try {
-    const { userData, items, appliedCouponCode, total, user, isGuest } = req.body;
+    const { userData, items, appliedCouponCode, total, user, isGuest, trafficSource } = req.body;
 
     // مراجعة الـ items القادمة من الفرونت إند
     // تأكد أن مصفوفة items تحتوي بالفعل على isPreOrder و depositAmount
@@ -286,6 +286,7 @@ const makeOrder = async (req, res) => {
     const newOrder = new OrderModel({
       user: user || null,
       userData,
+      trafficSource: trafficSource || {},
       items: formattedItems, // استخدم المصفوفة المهيأة
       total,
       appliedCouponCode,

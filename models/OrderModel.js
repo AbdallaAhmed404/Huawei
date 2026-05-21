@@ -17,6 +17,12 @@ const OrderSchema = new mongoose.Schema(
       city: String,
       district: String
     },
+    // --- أضف هذا الحقل هنا ---
+    trafficSource: {
+      utm_source: { type: String, default: 'Direct' },
+      utm_medium: { type: String, default: 'None' },
+      utm_campaign: { type: String, default: 'None' }
+    },
     items: [
       {
         productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' }, // يفضل ربط المنتج بـ ID
