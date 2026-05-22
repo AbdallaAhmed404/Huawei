@@ -15,14 +15,51 @@ const Stats = require('../models/Stats');
 
 const trackVisit = async (req, res) => {
     try {
-        // بيبحث عن العداد اللي اسمه site_visits ويزوده 1
-        // لو مش موجود في قاعدة البيانات بيكريهه أوتوماتيك (upsert: true)
-        await Stats.findOneAndUpdate(
-            { key: 'site_visits' },
-            { $inc: { count: 1 } },
-            { upsert: true, new: true }
+        const { utm_source } = req.body;
+        
+        // 1. تصحيح الكلمة المطبعية وتنظيف البيانات
+        const sourceName = utm_source ? utm_source.toLowerCase().trim() : 'direct';
+
+        // 2. محاولة تحديث العنصر لو المصدر موجود بالفعل داخل المصفوفة
+        const result = await Stats.updateOne(
+            { key: 'site_visits', 'sources.sourceName': sourceName },
+            { 
+                $inc: { 
+                    count: 1,                  // زيادة العداد الإجمالي للموقع
+                    'sources.$.count': 1       // زيادة عداد المصدر المحدد داخل المصفوفة
+                } 
+            }
         );
-        res.status(200).json({ success: true, message: "Visit counted" });
+
+        // 3. لو المصدر مش موجود في المصفوفة (سواء الوثيقة كاملة مش موجودة أو المصدر نفسه جديد)
+        if (result.matchedCount === 0) {
+            // بنستخدم الـ $addToSet أو $push مع التحقق، وهنا بنعمل أولاً ضمان لوجود الوثيقة الرئيسية
+            await Stats.findOneAndUpdate(
+                { key: 'site_visits' },
+                { 
+                    $inc: { count: 1 } // زيادة العداد الإجمالي
+                },
+                { upsert: true, new: true } // إنشاؤها لو مش موجودة
+            );
+
+            // الآن نقوم بدفع (Push) المصدر الجديد أو زيادته بأمان لو انشئ في نفس اللحظة
+            const pushResult = await Stats.updateOne(
+                { key: 'site_visits', 'sources.sourceName': { $ne: sourceName } },
+                { 
+                    $push: { sources: { sourceName: sourceName, count: 1 } } 
+                }
+            );
+
+            // حالة نادرة جداً: لو يوزر تاني ضاف المصدر في نفس الميكروثانية بين الخطوتين اللي فوق، بنزوده بس
+            if (pushResult.matchedCount === 0) {
+                await Stats.updateOne(
+                    { key: 'site_visits', 'sources.sourceName': sourceName },
+                    { $inc: { 'sources.$.count': 1 } }
+                );
+            }
+        }
+
+        res.status(200).json({ success: true, message: `Visit tracked for source: ${sourceName}` });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
@@ -30,10 +67,26 @@ const trackVisit = async (req, res) => {
 
 const getStats = async (req, res) => {
     try {
+        // بنبحث عن الوثيقة اللي فيها مفتاح site_visits
         const data = await Stats.findOne({ key: 'site_visits' });
-        res.status(200).json({ totalVisits: data ? data.count : 0 });
+
+        if (!data) {
+            return res.status(200).json({ 
+                success: true, 
+                stats: { count: 0, sources: [] } 
+            });
+        }
+
+        // بنبعت الـ data كاملة للفرونت إيند
+        res.status(200).json({ 
+            success: true, 
+            stats: data 
+        });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ 
+            success: false, 
+            error: err.message 
+        });
     }
 };
 
